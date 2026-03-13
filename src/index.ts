@@ -4,6 +4,8 @@ import Fastify from "fastify";
 import sensible from "@fastify/sensible";
 import { webhookRoutes } from "./routes/webhook.js";
 import { dataRoutes } from "./routes/data.js";
+import { searchRoutes } from "./routes/search.js";
+import { startWorker } from "./services/queue.js";
 
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -52,8 +54,11 @@ app.addHook("onRequest", (req, reply, done) => {
 // ── Routes ────────────────────────────────────────────────────────────────
 await app.register(webhookRoutes);
 await app.register(dataRoutes);
+await app.register(searchRoutes);
 
 app.get("/health", async () => ({ status: "ok", ts: new Date().toISOString() }));
+
+startWorker();
 
 // ── Start ─────────────────────────────────────────────────────────────────
 try {

@@ -1,8 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error("GEMINI_API_KEY is not set");
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export interface CommitAnalysis {
   summary: string;
@@ -43,39 +45,34 @@ Guidelines:
 - Keep each field concise: 1–3 sentences max
 - affected_files should list every file touched, max 20 entries`;
 
-/**
- * Analyze a commit diff using Claude and return structured documentation.
- */
 export async function analyzeCommit(
   commitMessage: string,
   diff: string,
   diffTruncated: boolean
 ): Promise<{ analysis: CommitAnalysis; rawResponse: string }> {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: SYSTEM_PROMPT,
+  });
+
   const userMessage = `Commit message: ${commitMessage}
 ${diffTruncated ? "\nNote: This diff was truncated due to size. Analyze what is visible.\n" : ""}
 Diff:
 ${diff}`;
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userMessage }],
-  });
-
-  const rawResponse = message.content
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+  const result = await model.generateContent(userMessage);
+  const rawResponse = result.response.text();
 
   let analysis: CommitAnalysis;
   try {
-    // Strip any accidental markdown fences before parsing
-    const cleaned = rawResponse.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+    let cleaned = rawResponse.trim();
+    if (cleaned.startsWith("```json")) {
+      cleaned = cleaned.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+    } else if (cleaned.startsWith("```")) {
+      cleaned = cleaned.replace(/^```\n?/, "").replace(/\n?```$/, "");
+    }
     analysis = JSON.parse(cleaned) as CommitAnalysis;
   } catch {
-    // If parsing fails, wrap the raw response in a minimal valid structure
-    // so we always have something to store rather than a hard failure.
     analysis = {
       summary: "Analysis could not be parsed — see raw response",
       why: "",
@@ -83,7 +80,7 @@ ${diff}`;
       risks: "",
       affected_files: [],
     };
-    console.error("Failed to parse AI response as JSON:", rawResponse);
+    console.error("Failed to parse Gemini response as JSON:", rawResponse);
   }
 
   return { analysis, rawResponse };
