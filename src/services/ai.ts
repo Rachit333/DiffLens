@@ -1,10 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is not set");
+function getClient() {
+  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not set");
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 }
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export interface CommitAnalysis {
   summary: string;
@@ -50,7 +49,7 @@ export async function analyzeCommit(
   diff: string,
   diffTruncated: boolean
 ): Promise<{ analysis: CommitAnalysis; rawResponse: string }> {
-  const model = genAI.getGenerativeModel({
+  const model = getClient().getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: SYSTEM_PROMPT,
   });

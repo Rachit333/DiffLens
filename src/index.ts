@@ -10,14 +10,7 @@ import { startWorker } from "./services/queue.js";
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const HOST = process.env.HOST ?? "0.0.0.0";
 
-const app = Fastify({
-  logger: {
-    transport:
-      process.env.NODE_ENV !== "production"
-        ? { target: "pino-pretty", options: { colorize: true } }
-        : undefined,
-  },
-});
+const app = Fastify({ logger: true });
 
 // ── Plugins ──────────────────────────────────────────────────────────────────
 await app.register(sensible);
